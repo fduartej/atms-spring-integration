@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:util="http://www.springframework.org/schema/util" xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-jms="http://www.springframework.org/schema/integration/jms"
+	xmlns:int-mail="http://www.springframework.org/schema/integration/mail"
+	xmlns:int-http="http://www.springframework.org/schema/integration/http"
+	xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+  http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+  http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+  http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration-4.2.xsd
+  http://www.springframework.org/schema/integration/jms http://www.springframework.org/schema/integration/jms/spring-integration-jms-4.2.xsd
+  http://www.springframework.org/schema/integration/mail http://www.springframework.org/schema/integration/mail/spring-integration-mail-4.2.xsd
+  http://www.springframework.org/schema/integration/http http://www.springframework.org/schema/integration/http/spring-integration-http-4.2.xsd
+  http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.0.xsd
+   http://www.springframework.org/schema/data/jpa http://www.springframework.org/schema/data/jpa/spring-jpa.xsd
+  ">
+	
+<!-- internal  -->
+	<!-- status app  -->
+	<int:channel id="requestStatusChannel" />
+	<int:channel id="responseStatusChannel" />
+	<int-http:inbound-gateway id="httpInboundStatus"
+		request-channel="requestStatusChannel" reply-channel="responseStatusChannel"
+		supported-methods="GET" path="/integration/status" />
+	<int:service-activator input-channel="requestStatusChannel" ref="atmServiceImpl" method="status" />
+
+	<!-- create atm  -->
+	<int:channel id="requestCreateChannel" />
+	<int:channel id="responseCreateChannel" />
+	<int-http:inbound-gateway id="httpInboundCreate"
+		request-channel="requestCreateChannel" reply-channel="responseCreateChannel"
+		request-payload-type="com.atm.domain.ATM"
+		supported-methods="POST" path="/integration/create" />
+	<int:service-activator input-channel="requestCreateChannel" ref="atmServiceImpl" method="create" /> 
+
+	<!-- list all atms  -->
+	<int:channel id="requestAtmTestChannel" />
+	<int:channel id="responseAtmTestChannel" />
+	<int-http:inbound-gateway id="httpInboundStatus"
+		request-channel="requestAtmTestChannel" reply-channel="responseAtmTestChannel"
+		supported-methods="GET" path="/integration/atms" />
+	<int:service-activator input-channel="requestAtmTestChannel" ref="atmServiceImpl" method="getAllAtms" />
+
+
+<!-- External  -->
+	<!-- atms external link using HTTPS it need to install certificate on cacert  -->
+	<int:channel id="requestAtmChannel" />
+	<int:channel id="responseAtmChannel">
+		<int:queue capacity="10" />
+	</int:channel>
+	
+	<int:chain input-channel="requestAtmChannel" output-channel="responseAtmChannel">
+		<int:header-enricher>
+			<int:header name="Content-Type" value="application/json;charset=utf-8" />
+		</int:header-enricher>
+		<int-http:outbound-gateway 
+			id="httpOutboundAtms"
+			url="https://www.ing.nl/api/locator/atms/" 
+			http-method="GET"
+			expected-response-type="java.lang.String" 
+			request-factory="requestFactory" 
+			charset="UTF-8" />
+			<!-- Remove request-factory tag if you do not use proxy -->
+	</int:chain>
+
+	<!-- Comment the block below if you do not use proxy -->
+	<bean id="requestFactory"
+		class="org.springframework.http.client.SimpleClientHttpRequestFactory">
+		<property name="proxy">
+			<bean id="proxy" class="java.net.Proxy">
+				<constructor-arg>
+					<util:constant static-field="java.net.Proxy.Type.HTTP" />
+				</constructor-arg>
+				<constructor-arg>
+					<bean class="java.net.InetSocketAddress">
+						<constructor-arg value="10.10.0.251" />
+						<constructor-arg value="8080" />
+					</bean>
+				</constructor-arg>
+			</bean>
+		</property>
+	</bean>
+
+</beans>
